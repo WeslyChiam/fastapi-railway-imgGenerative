@@ -48,7 +48,7 @@ async def img_base64(data: PromptRequest, authorization: str = Header(default = 
     token = resolve_token(authorization)
     if token is None:
         token = HUGGING_FACE_API_KEY
-    if not await is_model_available(model=model, token=token):
+    if data.model is None:
         model = "openfree/flux-chatgpt-ghibli-lora"
     try:
         image_data = await imageBase64Generate(
@@ -71,7 +71,8 @@ async def img(
     token = resolve_token(authorization)
     if token is None:
         token = HUGGING_FACE_API_KEY
-    if not await is_model_available(model=model, token=token):
+    # if not await is_model_available(model=model, token=token):
+    if data.model is None:
         model = "openfree/flux-chatgpt-ghibli-lora"
     try:
         image_data = await imageGenerate(
