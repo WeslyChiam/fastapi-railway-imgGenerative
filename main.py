@@ -22,11 +22,12 @@ if os.getenv("RAILWAY_ENVIRONMENT") is None:
 HUGGING_FACE_API_KEY = os.getenv("HUGGING_FACE_API_KEY")
 if HUGGING_FACE_API_KEY is None:
     raise EnvironmentError("HUGGING_FACE_API_KEY is not set!")
-try:
-    login(token=HUGGING_FACE_API_KEY)
-    print("Login!")
-except Exception as e:
-    raise EnvironmentError("Unable to login in huggingface!")
+
+# try:
+#     login(token=HUGGING_FACE_API_KEY)
+#     print("Login!")
+# except Exception as e:
+#     raise EnvironmentError("Unable to login in huggingface!")
 
 
 logging.basicConfig(level=logging.INFO)
