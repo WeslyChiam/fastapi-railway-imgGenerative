@@ -1,10 +1,6 @@
-from diffusers import AutoPipelineForText2Image
-from io import BytesIO
-import torch
 import base64
 import httpx
 import asyncio
-import os
 import logging
 
 TIMEOUT = 60.0 
@@ -13,6 +9,45 @@ RETRIES = 3
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def resolve_token(auth_header: str | None) -> str | None:
+    if not auth_header:
+        return None
+    if auth_header.lower().startswith("bearer "):
+        # return auth_header.strip()
+        token = auth_header[7:].strip()
+    else:
+        token = auth_header.strip()
+    if token.startswith("hf_"):
+        return token
+    return None
+
+async def fetch_image_bytes(prompt, model, token, retries=RETRIES, delay=RETRY_DELY):
+    url = f"https://router.huggingface.co/hf-inference/models/{model}"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+    payload = {"inputs": prompt}
+    for attempt in range(retries):
+        try:
+            async with httpx.AsyncClient(timeout = TIMEOUT) as client:
+                response = await client.post(url, headers=headers, json=payload)
+                if response.status_code == 200:
+                    image_bytes = response.content 
+                    return image_bytes
+                elif response.status_code in [500, 502, 503, 504]:
+                    logger.warning(f"Attempt {attempt+1}: Temporary error {response.status_code}, retrying...")
+                else:
+                    logger.error(f"Attempt {attempt+1}: Unexpected status {response.status_code}, retrying...")
+                    response.raise_for_status()
+        except httpx.RequestError as e:
+            logger.error(f"Attempt {attempt+1} Request error: {e}")
+        except Exception as e:
+            logger.error(f"Attempt {attempt+1}: Unexpected error: {e}")
+        await asyncio.sleep(min(delay * (2 ** attempt), 10.0))
+    logger.error("All retry attempts failed.")
+    raise RuntimeError("Failed to get image from Hugging Face API after retries.")
 
 async def is_model_available(model: str, token: str) -> bool:
     """Check if the Hugging Face Model is available"""
@@ -42,31 +77,14 @@ async def imageBase64Generate(
         retries: int = RETRIES, 
         delay: float = RETRY_DELY, 
 ):
-    url = f"https://router.huggingface.co/hf-inference/models/{model}"
-    headers = {
-        "Authorization": f"Bearer {token}", 
-        "Content-Type": "application/json",
-    }
-    payload = {"inputs": prompt}
-
-    for attempt in range(retries):
-        try:
-            async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-                response = await client.post(url, headers=headers, json=payload)
-                if response.status_code == 200:
-                    image_bytes = response.content
-                    return base64.b64encode(image_bytes).decode("utf-8")
-                elif response.status_code in [500, 502, 503, 504]:
-                    logger.warning(f"Attempt {attempt+1}: Temporary error {response.status_code}, retrying...")
-                else:
-                    logger.error(f"Attempt {attempt+1}: Unexpected status {response.status_code}, retrying...")
-                    response.raise_for_status()
-        except httpx.RequestError as e:
-            logger.error(f"Attempt {attempt+1} Request error: {e}")
-        except Exception as e:
-            logger.error(f"Attempt {attempt+1}: Unexpected error: {e}")
-        await asyncio.sleep(delay)
-    raise RuntimeError("Failed to get image from Hugging Face API after retries.")
+    image_bytes = await fetch_image_bytes(
+        prompt=prompt, 
+        model=model, 
+        token=token, 
+        retries=retries, 
+        delay=delay, 
+    )
+    return base64.b64encode(image_bytes).decode("utf-8")
 
 async def imageGenerate(
         prompt: str, 
@@ -75,29 +93,12 @@ async def imageGenerate(
         retries: int = RETRIES, 
         delay: float = RETRY_DELY, 
 ):
-    url = f"https://router.huggingface.co/hf-inference/models/{model}"
-    headers = {
-        "Authorization": f"Bearer {token}", 
-        "Content-Type": "application/json",
-    }
-    payload = {"inputs": prompt}
+    image_bytes = await fetch_image_bytes(
+        prompt=prompt, 
+        model=model, 
+        token=token, 
+        retries=retries, 
+        delay=delay, 
+    )
+    return image_bytes
 
-    for attempt in range(retries):
-        try:
-            async with httpx.AsyncClient(timeout=TIMEOUT) as client:
-                response = await client.post(url, headers=headers, json=payload)
-                if response.status_code == 200:
-                    # image_bytes = response.content
-                    # return base64.b64encode(image_bytes).decode("utf-8")
-                    return response.content
-                elif response.status_code in [500, 502, 503, 504]:
-                    logger.warning(f"Attempt {attempt+1}: Temporary error {response.status_code}, retrying...")
-                else:
-                    logger.error(f"Attempt {attempt+1}: Unexpected status {response.status_code}, retrying...")
-                    response.raise_for_status()
-        except httpx.RequestError as e:
-            logger.error(f"Attempt {attempt+1} Request error: {e}")
-        except Exception as e:
-            logger.error(f"Attempt {attempt+1}: Unexpected error: {e}")
-        await asyncio.sleep(delay)
-    raise RuntimeError("Failed to get image from Hugging Face API after retries.")

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, constr
+from pydantic import BaseModel, Field, constr, validator
 from typing import Optional, Literal
 
 class PromptRequest(BaseModel):
@@ -8,6 +8,9 @@ class PromptRequest(BaseModel):
         "openfree/flux-chatgpt-ghibli-lora"
     ]] = Field(default="openfree/flux-chatgpt-ghibli-lora", example="openfree/flux-chatgpt-ghibli-lora")
 
-class ImageResponse(BaseModel):
-    image_base64: str
+    @validator("prompt")
+    def prompt_must_not_be_empty(cls, v):
+        if not v.strip():
+            raise ValueError("Prompt must not be empty.")
+        return v
 
