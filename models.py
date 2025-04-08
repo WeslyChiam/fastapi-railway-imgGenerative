@@ -8,5 +8,6 @@ class PromptRequest(BaseModel):
         "openfree/flux-chatgpt-ghibli-lora"
     ]] = Field(default="openfree/flux-chatgpt-ghibli-lora", example="openfree/flux-chatgpt-ghibli-lora")
 
-
+class ImageResponse(BaseModel):
+    image_base64: str
 
