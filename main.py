@@ -16,7 +16,7 @@ import os
 
 app = FastAPI()
 
-# load_dotenv()
+load_dotenv()
 HUGGING_FACE_API_KEY = os.getenv("HUGGING_FACE_API_KEY")
 if not HUGGING_FACE_API_KEY:
     raise EnvironmentError("HUGGING_FACE_API_KEY is not set. Please check environment vairables or .env file.")
@@ -74,3 +74,9 @@ async def img(data: PromptRequest):
         return FileResponse(image_path.name, media_type="image/png", filename="output.png")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+if __name__ == "__main__":
+    import uvicorn
+    port = 8080
+    uvicorn.run(app, host="0.0.0.0", port=port)
+
