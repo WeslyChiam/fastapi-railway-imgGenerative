@@ -1,22 +1,31 @@
 from fastapi import FastAPI, Request, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, FileResponse
 
-from classes import PromptRequest
+from models import PromptRequest
+from middleware import executable_time
 
 import time 
 import datetime
+import logging
 
 app = FastAPI()
 
-promptRequest = PromptRequest
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Enable CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True, 
+    allow_methods=["*"], 
+    allow_headers=["*"],
+)
+
+app.middleware("http")(executable_time)
 
 
-@app.middleware("http")
-async def executable_time(request: Request, call_next):
-    start_time = time.time()
-    response = await call_next(request)
-    process_time = time.time() - start_time
-    response.headers["X-Execution-Time"] = str(datetime.timedelta(seconds=process_time))
-    return response
 
 @app.get("/")
 async def root():
