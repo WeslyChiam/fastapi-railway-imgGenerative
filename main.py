@@ -16,12 +16,17 @@ import os
 
 app = FastAPI()
 
-if os.getenv("RAILWAY_ENVIRONMENT") is None:
-    # Run Locally
-    load_dotenv()
+# if os.getenv("RAILWAY_ENVIRONMENT") is None:
+#     # Run Locally
+#     load_dotenv()
+# HUGGING_FACE_API_KEY = os.getenv("HUGGING_FACE_API_KEY")
+# if HUGGING_FACE_API_KEY is None:
+#     raise EnvironmentError("HUGGING_FACE_API_KEY is not set!")
+
+load_dotenv()
 HUGGING_FACE_API_KEY = os.getenv("HUGGING_FACE_API_KEY")
-if HUGGING_FACE_API_KEY is None:
-    raise EnvironmentError("HUGGING_FACE_API_KEY is not set!")
+if not HUGGING_FACE_API_KEY:
+    raise EnvironmentError("HUGGING_FACE_API_KEY is not set. Please check environment vairables or .env file.")
 
 # try:
 #     login(token=HUGGING_FACE_API_KEY)
