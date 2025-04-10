@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, HTTPException, Header, BackgroundTasks, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
 from models import *
@@ -12,6 +13,9 @@ import tempfile
 import os 
 import io
 import base64
+import shutil
+import uuid
+import asyncio
 
 app = FastAPI()
 
@@ -23,8 +27,15 @@ IMAGE_PIG = os.getenv("IMAGE_PIG")
 if not IMAGE_PIG:
     raise EnvironmentError("Please check environment variables or .env file.")
 
+app.mount("/images", StaticFiles(directory="temp_images"), name="images")
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+async def delete_file_later(path: str, delay_seconds: int = 600):
+    await asyncio.sleep(delay_seconds)
+    if os.path.exists(path):
+        os.remove(path)
 
 # Enable CORS
 app.add_middleware(
@@ -115,7 +126,9 @@ async def img_raw_hugging(data: HuggingPromptRequest, authorization: str = Heade
         raise HTTPException(status_code=500, detail=str(e))
     
 @app.post("/img64ImagePig", tags=["Image Pig"])
-async def img_base64_imagepig(data: ImagePigPromptRequest, authorization: str = Header(default = None)):
+async def img_base64_imagepig(
+    data: ImagePigPromptRequest, 
+    authorization: str = Header(default = None)):
     """Output image data in base64 format"""
     # return {"data": "Hehe"}
     
@@ -133,8 +146,9 @@ async def img_base64_imagepig(data: ImagePigPromptRequest, authorization: str = 
 @app.post("/imgFileImagePig", tags=["Image Pig"])
 async def img_file_imagepig(
     data: ImagePigPromptRequest, 
+    request: Request,
     background_tasks: BackgroundTasks,
-    download: bool = Query(default=False),
+    # download: bool = Query(default=False),
     authorization: str = Header(default = None),
 ):
     """Output image file"""
@@ -144,14 +158,23 @@ async def img_file_imagepig(
         token = authorization 
     try:
         image_data = await fetchImagePig(prompt=data.prompt, token=token)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".png", mode="wb") as image_file:
-            image_file.write(base64.b64decode(image_data))
-            image_path = image_file.name
-        background_tasks.add_task(os.unlink, image_path)
-        if download:
-            return FileResponse(image_path, media_type="image/png", filename="output.png")
-        else:
-            return FileResponse(image_path, media_type="image/png")
+        # Use this to store file temporary after response
+        unique_id = f"{uuid.uuid4().hex}.png"
+        file_path = f"temp_images/{unique_id}"
+        with open(file_path, "wb") as f:
+            f.write(base64.b64decode(image_data))
+        background_tasks.add_task(delete_file_later, file_path, 600)
+        url = str(request.base_url) + f"/images/{unique_id}"
+        return JSONResponse(content={"url": url})
+        # Use this to delete file after response
+        # with tempfile.NamedTemporaryFile(delete=False, suffix=".png", mode="wb") as image_file:
+        #     image_file.write(base64.b64decode(image_data))
+        #     image_path = image_file.name
+        # background_tasks.add_task(os.unlink, image_path)
+        # if download:
+        #     return FileResponse(image_path, media_type="image/png", filename="output.png")
+        # else:
+        #     return FileResponse(image_path, media_type="image/png")
     except Exception as e:
         raise HTTPException(status_code = 500, detail = str(e))
     
