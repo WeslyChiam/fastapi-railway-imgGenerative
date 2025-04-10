@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, HTTPException, Header, BackgroundTasks
+from fastapi import FastAPI, Request, HTTPException, Header, BackgroundTasks, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from dotenv import load_dotenv
@@ -134,6 +134,7 @@ async def img_base64_imagepig(data: ImagePigPromptRequest, authorization: str = 
 async def img_file_imagepig(
     data: ImagePigPromptRequest, 
     background_tasks: BackgroundTasks,
+    download: bool = Query(default=False),
     authorization: str = Header(default = None),
 ):
     """Output image file"""
@@ -147,7 +148,10 @@ async def img_file_imagepig(
             image_file.write(base64.b64decode(image_data))
             image_path = image_file.name
         background_tasks.add_task(os.unlink, image_path)
-        return FileResponse(image_path, media_type="image/png", filename="output.png")
+        if download:
+            return FileResponse(image_path, media_type="image/png", filename="output.png")
+        else:
+            return FileResponse(image_path, media_type="image/png")
     except Exception as e:
         raise HTTPException(status_code = 500, detail = str(e))
     
