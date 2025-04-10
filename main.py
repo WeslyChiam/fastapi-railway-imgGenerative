@@ -167,7 +167,7 @@ async def img_file_imagepig(
         with open(file_path, "wb") as f:
             f.write(base64.b64decode(image_data))
         background_tasks.add_task(delete_file_later, file_path, 600)
-        url = str(request.base_url) + f"/images/{unique_id}"
+        url = str(request.base_url).rstrip("/") + f"/images/{unique_id}"
         return JSONResponse(content={"url": url})
         # Use this to delete file after response
         # with tempfile.NamedTemporaryFile(delete=False, suffix=".png", mode="wb") as image_file:
