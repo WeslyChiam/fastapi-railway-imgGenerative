@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 from models import *
 from middleware import executable_time
-from functions import ImagePigimageBase64Generate, imageBase64Generate, imageGenerate, resolve_token, fetchImagePig
+from functions import ImagePigimageBase64Generate, imageBase64Generate, imageGenerate, resolve_token, fetchImagePig, ensure_dir
 
 import logging
 import tempfile
@@ -158,6 +158,9 @@ async def img_file_imagepig(
         token = authorization 
     try:
         image_data = await fetchImagePig(prompt=data.prompt, token=token)
+        # Ensure temp file path exists
+        temp_dir = "temp_images"
+        ensure_dir(temp_dir)
         # Use this to store file temporary after response
         unique_id = f"{uuid.uuid4().hex}.png"
         file_path = f"temp_images/{unique_id}"

@@ -5,6 +5,7 @@ import httpx
 import asyncio
 import logging
 import requests
+import os
 
 TIMEOUT = 60.0 
 RETRY_DELY = 2.5
@@ -12,6 +13,9 @@ RETRIES = 3
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def ensure_dir(path: str):
+    os.makedirs(path, exist_ok=True)
 
 def resolve_token(auth_header: str | None) -> str | None:
     if not auth_header:
