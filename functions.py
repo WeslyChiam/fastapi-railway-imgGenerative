@@ -113,37 +113,21 @@ async def fetchImagePig(
         prompt: str, 
         token: str,
 ):
-    async with httpx.AsyncClient(timeout=60) as client:
-        response = await client.post(
-            "https://api.imagepig.com/",
-            headers = {"Api-Key": token}, 
-            json = {"prompt": prompt}, 
-        )
-        if response.status_code == 200:
-            return response.json()["image_data"]
-        else:
-            response.raise_for_status()
-
-async def fetchImagePig(
-        prompt: str, 
-        token: str,
-):
-    async with httpx.AsyncClient(timeout=60) as client:
-        response = await client.post(
-            "https://api.imagepig.com/",
-            headers = {"Api-Key": token}, 
-            json = {"prompt": prompt}, 
-        )
-        if response.status_code == 200:
-            return response.json()["image_data"]
-        else:
-            response.raise_for_status()
+    response = requests.post(
+        "https://api.imagepig.com/",
+        headers = {"Api-Key": token}, 
+        json = {"prompt": prompt}
+    )
+    if response.status_code == 200:
+        return response.json()["image_data"]
+    else:
+        response.raise_for_status()
 
 async def ImagePigimageBase64Generate(
         prompt: str, 
         token: str, 
 ):
-    image_data = fetchImagePig(
+    image_data = await fetchImagePig(
         prompt=prompt, 
         token=token, 
     )
