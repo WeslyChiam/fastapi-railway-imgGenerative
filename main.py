@@ -168,7 +168,7 @@ async def img_file_imagepig(
         logger.info("Saved to:", os.path.abspath(file_path))
         background_tasks.add_task(delete_file_later, file_path, 600)
         # url = str(request.base_url).rstrip("/") + f"/{file_path}"
-        url = str(request.base_url).rstrip("/") + f"/images/{unique_id}"
+        url = str(request.base_url).replace("http://", "https://").rstrip("/") + f"/images/{unique_id}"
         return JSONResponse(content={"url": url})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
