@@ -18,7 +18,7 @@ class OpenAIPromptRequest(BaseModel):
 class OpenAIEditPromptRequest(BaseModel):
     prompt: constr(min_length=1, max_length=1000) = Field(...) # type: ignore
     img_url: HttpUrl 
-    mask_url = Optional[HttpUrl] = None
+    mask_url: Optional[HttpUrl] = None
     model: Optional[Literal["dall-e-2"]] = Field(default="dall-e-2")
     
 

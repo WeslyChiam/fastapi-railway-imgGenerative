@@ -210,14 +210,15 @@ async def img_edit_openai(
     """Edit image by providing url contain image"""
     try:
         client = OpenAI(api_key=credentials.credentials)
-        img_path = functions.download_img_tmp(data.img_url)
+        img_path = await functions.download_img_tmp(data.img_url)
         if data.mask_url:
-            mask_path = functions.download_img_tmp(data.mask_url)
+            mask_path = await functions.download_img_tmp(data.mask_url)
         else:
             mask_path = None
+        mask_file = open(mask_path, 'rb') if mask_path else None
         response = client.images.edit(
             image = open(img_path, 'rb'),
-            mask = open(mask_path, 'rb'),
+            mask = mask_file,
             prompt = data.prompt,
             n = 1, 
             size = "1024x1024",

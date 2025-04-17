@@ -7,6 +7,7 @@ import logging
 import requests
 import shutil
 import tempfile
+import mimetypes
 import os
 
 TIMEOUT = 60.0 
@@ -135,15 +136,24 @@ async def ImagePigimageBase64Generate(
     )
     return image_data
 
-def download_img_tmp(url: str):
+async def download_img_tmp(url: str):
     try:
-        response = requests.get(url, stream=False, timeout=10)
-        response.raise_for_status()
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.get(url=url)
+            response.raise_for_status()
 
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
-        with open(temp_file.name, 'wb') as output:
-            shutil.copyfileobj(response.raw, output)
-        return temp_file.name
+            content_type = response.headers.get("Content-Type", "").lower()
+            if "image" not in content_type:
+                raise ValueError(f"URL did not return an image, {content_type}")
+            
+            mime = content_type.split(";")[0]
+            exts = mimetypes.guess_all_extensions(mime)
+            ext = exts[0] if exts else ".jpg"
+
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
+            with open(temp_file.name, 'wb') as output:
+                output.write(response.content)
+            return temp_file.name
     except Exception as e:
         raise ValueError(f"Unable to download {url}: {e}")
 
