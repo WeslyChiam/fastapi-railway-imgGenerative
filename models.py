@@ -22,3 +22,9 @@ class ImagePigPromptRequest(BaseModel):
             raise ValueError("Prompt must not be empty.")
         return v
 
+class OpenAIPromptRequest(BaseModel):
+    prompt: constr(min_length=1, max_length=1000) = Field(..., example="Astronaunt riding a horse") # type: ignore
+    model: Optional[Literal["dall-e-2"]] = Field(default="dall-e-2")
+    
+
+

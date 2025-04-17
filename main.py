@@ -1,24 +1,28 @@
-from fastapi import FastAPI, Request, HTTPException, Header, BackgroundTasks, Query
+from dotenv import load_dotenv
+from fastapi import FastAPI, Request, HTTPException, Header, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.staticfiles import StaticFiles
-from dotenv import load_dotenv
-from typing import Optional
+from openai import OpenAI
+from typing import Optional, Annotated
 
-from models import *
-from middleware import executable_time
 from functions import imageBase64Generate, imageGenerate, resolve_token, fetchImagePig, ensure_dir
+from middleware import executable_time
+from models import *
 
-import logging
-import tempfile
-import os 
-import io
-import base64
-import shutil
-import uuid
 import asyncio
+import base64
+import io
+import logging
+import os 
+import shutil
+import tempfile
+import uuid
 
 app = FastAPI()
+
+bearer_scheme = HTTPBearer()
 
 load_dotenv()
 HUGGING_FACE_API_KEY = os.getenv("HUGGING_FACE_API_KEY")
@@ -188,6 +192,27 @@ async def img_raw_imagepig(
         decoded_img = base64.b64decode(image_data)
         image_stream = io.BytesIO(decoded_img)
         return StreamingResponse(image_stream, media_type = "image/png")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/imgOpenAI", tags=["Open AI"])
+async def img_base64_openai(
+    data: OpenAIPromptRequest,
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)]
+):
+    """Output image via url using openai model"""
+    try:
+        client = OpenAI(api_key=credentials.credentials)
+        response = client.images.generate(
+            model = "dall-e-3", 
+            prompt = data.prompt, 
+            n = 1, 
+            size = "1024x1024"
+        )
+        if response is not None:
+            url = response.data[0].url
+            return JSONResponse(content=str(url))
+        return HTTPException(status_code=500, detail="Failed to create image")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
         
