@@ -211,7 +211,7 @@ async def img_base64_openai(
         )
         if response is not None:
             url = response.data[0].url
-            return JSONResponse(content=str(url))
+            return JSONResponse(content={"url": str(url)})
         return HTTPException(status_code=500, detail="Failed to create image")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
