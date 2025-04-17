@@ -5,6 +5,8 @@ import httpx
 import asyncio
 import logging
 import requests
+import shutil
+import tempfile
 import os
 
 TIMEOUT = 60.0 
@@ -132,6 +134,18 @@ async def ImagePigimageBase64Generate(
         token=token, 
     )
     return image_data
+
+def download_img_tmp(url: str):
+    try:
+        response = requests.get(url, stream=False, timeout=10)
+        response.raise_for_status()
+
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".jpg")
+        with open(temp_file.name, 'wb') as output:
+            shutil.copyfileobj(response.raw, output)
+        return temp_file.name
+    except Exception as e:
+        raise ValueError(f"Unable to download {url}: {e}")
 
 
 

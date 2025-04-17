@@ -7,9 +7,10 @@ from fastapi.staticfiles import StaticFiles
 from openai import OpenAI
 from typing import Optional, Annotated
 
-from functions import imageBase64Generate, imageGenerate, resolve_token, fetchImagePig, ensure_dir
 from middleware import executable_time
-from models import *
+
+import functions
+import models
 
 import asyncio
 import base64
@@ -64,20 +65,20 @@ async def health():
     return {"status": "ok"}
 
 @app.post("/img64Hugging", tags=["Hugging Face Hub"])
-async def img_base64_hugging(data: HuggingPromptRequest, authorization: str = Header(default = None)):
+async def img_base64_hugging(
+    data: models.HuggingPromptRequest, 
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)]
+):
     """Output image data in base64 format"""
     # Check model available
     model = data.model.strip()
-    token = resolve_token(authorization)
-    if token is None:
-        token = HUGGING_FACE_API_KEY
     if data.model is None:
         model = "openfree/flux-chatgpt-ghibli-lora"
     try:
-        image_data = await imageBase64Generate(
+        image_data = await functions.imageBase64Generate(
             prompt=data.prompt, 
             model=model,
-            token=token,
+            token=credentials.credentials,
         )
         return JSONResponse(content={"image_base64": image_data})
     except Exception as e:
@@ -85,23 +86,21 @@ async def img_base64_hugging(data: HuggingPromptRequest, authorization: str = He
 
 @app.post("/imgFileHugging", tags=["Hugging Face Hub"])
 async def img_file_hugging(
-    data: HuggingPromptRequest, 
+    data: models.HuggingPromptRequest, 
     background_tasks: BackgroundTasks,
-    authorization: str = Header(default = None)
+    # authorization: str = Header(default = None)
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)]
 ):
     """Output image file"""
     model = data.model.strip()
-    token = resolve_token(authorization)
-    if token is None:
-        token = HUGGING_FACE_API_KEY
     # if not await is_model_available(model=model, token=token):
     if data.model is None:
         model = "openfree/flux-chatgpt-ghibli-lora"
     try:
-        image_data = await imageGenerate(
+        image_data = await functions.imageGenerate(
             prompt=data.prompt, 
             model=model, 
-            token=token
+            token=credentials.credentials,
         )
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png", mode="wb") as image_file:
             image_file.write(image_data)
@@ -113,19 +112,19 @@ async def img_file_hugging(
         raise HTTPException(status_code=500, detail=str(e))
     
 @app.post("/imgHugging", tags=["Hugging Face Hub"])
-async def img_raw_hugging(data: HuggingPromptRequest, authorization: str = Header(default = None)):
+async def img_raw_hugging(
+    data: models.HuggingPromptRequest, 
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)]
+):
     """Output image directly"""
     model = data.model.strip()
-    token = resolve_token(authorization)
-    if token is None:
-        token = HUGGING_FACE_API_KEY 
     if data.model is None:
         model = "openfree/flux-chatgpt-ghibli-lora"
     try:
-        image_data = await imageGenerate(
+        image_data = await functions.imageGenerate(
             prompt=data.prompt,
             model=model,
-            token=token
+            token=credentials.credentials,
         )
         image_stream = io.BytesIO(image_data)
         return StreamingResponse(image_stream, media_type="image/png")
@@ -134,37 +133,28 @@ async def img_raw_hugging(data: HuggingPromptRequest, authorization: str = Heade
     
 @app.post("/img64ImagePig", tags=["Image Pig"])
 async def img_base64_imagepig(
-    data: ImagePigPromptRequest, 
-    authorization: str = Header(default = None)):
+    data: models.ImagePigPromptRequest, 
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)]):
     """Output image data in base64 format"""
-    # return {"data": "Hehe"}
-    
-    if authorization is None:
-        token = IMAGE_PIG
-    else:
-        token = authorization
     try:
         # image_data = await ImagePigimageBase64Generate(prompt=data.prompt, token=token)
-        image_data = await fetchImagePig(prompt=data.prompt, token=token)
+        image_data = await functions.fetchImagePig(prompt=data.prompt, token=credentials.credentials)
         return JSONResponse(content={"image_base64": str(image_data)})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/fileImagePig", tags=["Image Pig"])
 async def img_file_imagepig(
-    data: ImagePigPromptRequest, 
+    data: models.ImagePigPromptRequest, 
     background_tasks: BackgroundTasks, 
     request: Request, 
-    auth: Optional[str] = Header(None), 
+    # auth: Optional[str] = Header(None), 
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)]
 ):
     """Output image filepath for temperory (default: 10 minutes)"""
-    if auth is None:
-        token = IMAGE_PIG 
-    else:
-        token = auth
     # return JSONResponse(content={"test": str(token)})
     try:
-        image_data = await fetchImagePig(prompt=data.prompt, token=token)
+        image_data = await functions.fetchImagePig(prompt=data.prompt, token=credentials.credentials)
         unique_id = f"{uuid.uuid4().hex}.png"
         file_path = f"temp_images/{unique_id}"
         with open(file_path, "wb") as f:
@@ -179,16 +169,12 @@ async def img_file_imagepig(
     
 @app.post("/imgImagePig", tags=["Image Pig"])
 async def img_raw_imagepig(
-    data: ImagePigPromptRequest, 
-    auth: str = Header(default = None),
+    data: models.ImagePigPromptRequest, 
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)]
 ):
     """Output image directly"""
-    if auth is None:
-        token = IMAGE_PIG
-    else:
-        token = auth
     try:
-        image_data = await fetchImagePig(prompt=data.prompt, token=token)
+        image_data = await functions.fetchImagePig(prompt=data.prompt, token=credentials.credentials)
         decoded_img = base64.b64decode(image_data)
         image_stream = io.BytesIO(decoded_img)
         return StreamingResponse(image_stream, media_type = "image/png")
@@ -196,8 +182,8 @@ async def img_raw_imagepig(
         raise HTTPException(status_code=500, detail=str(e))
     
 @app.post("/imgOpenAI", tags=["Open AI"])
-async def img_base64_openai(
-    data: OpenAIPromptRequest,
+async def img_openai(
+    data: models.OpenAIPromptRequest,
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)]
 ):
     """Output image via url using openai model"""
@@ -212,7 +198,34 @@ async def img_base64_openai(
         if response is not None:
             url = response.data[0].url
             return JSONResponse(content={"url": str(url)})
-        return HTTPException(status_code=500, detail="Failed to create image")
+        raise HTTPException(status_code=500, detail="Failed to create image")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/imgEditOpenAI", tags=["Open AI"])
+async def img_edit_openai(
+    data: models.OpenAIEditPromptRequest, 
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)]
+):
+    """Edit image by providing url contain image"""
+    try:
+        client = OpenAI(api_key=credentials.credentials)
+        img_path = functions.download_img_tmp(data.img_url)
+        if data.mask_url:
+            mask_path = functions.download_img_tmp(data.mask_url)
+        else:
+            mask_path = None
+        response = client.images.edit(
+            image = open(img_path, 'rb'),
+            mask = open(mask_path, 'rb'),
+            prompt = data.prompt,
+            n = 1, 
+            size = "1024x1024",
+        )
+        if response is not None:
+            url = response.data[0].url 
+            return JSONResponse(content = {"url": str(url)})
+        raise HTTPException(status_code=500, detail="Failed to edit image")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
         
