@@ -18,6 +18,7 @@ import io
 import logging
 import os 
 import shutil
+import httpx
 import tempfile
 import uuid
 
@@ -202,31 +203,72 @@ async def img_openai(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-@app.post("/imgEditOpenAI", tags=["Open AI"])
-async def img_edit_openai(
-    data: models.OpenAIEditPromptRequest, 
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)]
+@app.post("/imgFileOpenAI", tags=["Open AI"])
+async def img_file_openai(
+    data: models.OpenAIPromptRequest, 
+    background_tasks: BackgroundTasks,
+    request: Request,
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)], 
 ):
-    """Edit image by providing url contain image"""
+    """Output image via file response"""
     try:
         client = OpenAI(api_key=credentials.credentials)
-        img_path = await functions.download_img_tmp(data.img_url)
-        if data.mask_url:
-            mask_path = await functions.download_img_tmp(data.mask_url)
-        else:
-            mask_path = None
-        mask_file = open(mask_path, 'rb') if mask_path else None
-        response = client.images.edit(
-            image = open(img_path, 'rb'),
-            mask = mask_file,
-            prompt = data.prompt,
+        response = client.images.generate(
+            model = data.model, 
+            prompt = data.prompt, 
             n = 1, 
-            size = "1024x1024",
+            size = "1024x1024", 
+        )
+        if response is not None: 
+            url = response.data[0].url
+            # temp_path = functions.download_img_tmp(url=url)
+            async with httpx.AsyncClient(timeout=10) as client: 
+                img_response = await client.get(url=url)
+                img_response.raise_for_status()
+                content_type = img_response.headers.get("Content-Type", "").lower()
+                if "image" not in content_type:
+                    raise ValueError(f"URL did not return an image, {content_type}")
+            try:
+                encoded_str = base64.b64encode(img_response.content).decode('utf-8')
+                unique_id = f"{uuid.uuid4().hex}.png"
+                file_path = f"temp_images/{unique_id}"
+                with open(file_path, "wb") as f:
+                    f.write(base64.b64decode(encoded_str))
+                background_tasks.add_task(delete_file_later, file_path, 600)
+                return FileResponse(path=file_path)
+            except Exception as e:
+                raise HTTPException(status_code=500, detail={"error": str(e)})
+            return FileResponse(
+                path=temp_path, 
+                media_type="image/png", 
+                filename="output.png", 
+            )
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/base64ImgOpenAI", tags=["Open AI"])
+async def img_base64_openai(
+    data: models.OpenAIPromptRequest, 
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)]
+):
+    """Output image encoded base64 using openai model"""
+    try:
+        client = OpenAI(api_key=credentials.credentials)
+        response = client.images.generate(
+            model = "dall-e-2", 
+            prompt = data.prompt, 
+            n = 1, 
+            size = "256x256" 
         )
         if response is not None:
-            url = response.data[0].url 
-            return JSONResponse(content = {"url": str(url)})
-        raise HTTPException(status_code=500, detail="Failed to edit image")
+            image_response = await functions.download_and_encode(url=response.data[0].url)
+            return JSONResponse(
+                content= {
+                    "image_base64": image_response, 
+                }
+            )
+        raise HTTPException(status_code=500, detail="Failed to create image")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
         

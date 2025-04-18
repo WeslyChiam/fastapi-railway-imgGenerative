@@ -153,9 +153,24 @@ async def download_img_tmp(url: str):
             temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
             with open(temp_file.name, 'wb') as output:
                 output.write(response.content)
+            temp_file.close()
             return temp_file.name
     except Exception as e:
         raise ValueError(f"Unable to download {url}: {e}")
+    
+async def download_and_encode(url: str) -> str:
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.get(url = url)
+            response.raise_for_status()
+            content_type = response.headers.get("Content-Type", "").lower()
+            if "image" not in content_type:
+                raise ValueError(f"URL did not return an image, {content_type}")
+            encoded_str = base64.b64encode(response.content).decode("utf-8")
+            return encoded_str
+    except Exception as e:
+        raise ValueError(f"Unable to download and encode image: {e}")
+
 
 
 
