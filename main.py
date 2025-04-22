@@ -238,11 +238,6 @@ async def img_file_openai(
                 return FileResponse(path=file_path)
             except Exception as e:
                 raise HTTPException(status_code=500, detail={"error": str(e)})
-            return FileResponse(
-                path=temp_path, 
-                media_type="image/png", 
-                filename="output.png", 
-            )
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
