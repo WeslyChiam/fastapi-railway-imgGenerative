@@ -10,6 +10,8 @@ import tempfile
 import mimetypes
 import os
 
+import models
+
 TIMEOUT = 60.0 
 RETRY_DELY = 2.5
 RETRIES = 3
@@ -171,6 +173,21 @@ async def download_and_encode(url: str) -> str:
     except Exception as e:
         raise ValueError(f"Unable to download and encode image: {e}")
 
-
+async def imagine_download(data: models.ImaginePromptRequest, token: str):
+    response = requests.post(
+        "https://api.vyro.ai/v2/image/generations",
+        headers = {
+            "Authorization": f"Bearer {token}"
+        }, 
+        json = {
+            "prompt":  data.prompt, 
+            "style": data.style, 
+            "aspect_ratio": data.aspect
+        }
+    )
+    if response.status_code == 200:
+        return response.json()
+    else:
+        response.raise_for_status()
 
 

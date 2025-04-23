@@ -161,3 +161,7 @@ cython_debug/
 
 # Misc
 *.txt
+
+# Image File path
+temp_images/
+*.png

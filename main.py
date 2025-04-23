@@ -14,11 +14,12 @@ import models
 
 import asyncio
 import base64
+import httpx
 import io
 import logging
 import os 
+import requests
 import shutil
-import httpx
 import tempfile
 import uuid
 
@@ -207,7 +208,6 @@ async def img_openai(
 async def img_file_openai(
     data: models.OpenAIPromptRequest, 
     background_tasks: BackgroundTasks,
-    request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)], 
 ):
     """Output image via file response"""
@@ -264,6 +264,57 @@ async def img_base64_openai(
                 }
             )
         raise HTTPException(status_code=500, detail="Failed to create image")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/imgtmpFileImagine", tags=["Imagine"])
+async def img_tmpfile_imagine(
+    data: models.ImaginePromptRequest, 
+    request: Request,
+    background_task: BackgroundTasks, 
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)], 
+):
+    """Output image via url"""
+    try:
+        BASE_URL = "https://api.vyro.ai/v2/image/generations"
+        headers = {"Authorization": f"Bearer {credentials.credentials}"}
+        payload = {"prompt": (None, data.prompt), "style": (None, data.style), "aspect_ratio": (None, data.aspect)}
+        response = requests.post(BASE_URL, headers = headers, files = payload)
+        if response.status_code == 200:
+            image_data = response.content
+        else:
+            response.raise_for_status()
+        unique_id = f"{uuid.uuid4().hex}.png"
+        file_path = f"temp_images/{unique_id}"
+        with open(file_path, "wb") as f:
+            f.write(image_data)
+        background_task.add_task(delete_file_later, file_path, 600)
+        url = str(request.base_url).replace("http://", "https://").rstrip("/") + f"/images/{unique_id}"
+        return JSONResponse(content={"url": url})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/imgFileImagine", tags=["Imagine"])
+async def img_file_imagine(
+    data: models.ImaginePromptRequest, 
+    request: Request, 
+    background_task: BackgroundTasks, 
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)]
+):
+    """Output image via file response"""
+    try:
+        BASE_URL = "https://api.vyro.ai/v2/image/generations"
+        headers = {"Authorization": f"Bearer {credentials.credentials}"}
+        payload = {"prompt": (None, data.prompt), "style": (None, data.style), "aspect_ratio": (None, data.aspect)}        
+        response = requests.post(BASE_URL, headers=headers, files=payload)
+        if response.status_code == 200:
+            image_data = response.content
+        else:
+            response.raise_for_status()
+        filename = "output.png"
+        with open(filename, "wb") as f:
+            f.write(image_data)
+        return FileResponse(filename, filename=filename)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
         
