@@ -186,20 +186,33 @@ async def img_raw_imagepig(
 @app.post("/imgOpenAI", tags=["Open AI"])
 async def img_openai(
     data: models.OpenAIPromptRequest,
+    request: Request,
+    background_task: BackgroundTasks, 
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(bearer_scheme)]
 ):
     """Output image via url using openai model"""
     try:
         client = OpenAI(api_key=credentials.credentials)
         response = client.images.generate(
-            model = "dall-e-3", 
+            model = data.model, 
             prompt = data.prompt, 
             n = 1, 
             size = "1024x1024"
         )
         if response is not None:
-            url = response.data[0].url
-            return JSONResponse(content={"url": str(url)})
+            url = response.data[0].url #This is a signed url
+            signed_response = requests.get(url)
+            if signed_response.status_code == 200:
+                image_data = signed_response.content
+            else:
+                raise HTTPException(status_code=500, detail=f"Failed to donwload image from {signed_response}")
+            unique_id = f"{uuid.uuid4().hex}.png"
+            file_path = f"temp_images/{unique_id}"
+            with open(file_path, "wb") as f:
+                f.write(image_data)
+            background_task.add_task(delete_file_later, file_path, 600)
+            new_url = str(request.base_url).replace("http://", "https://").rstrip("/") + f"/images/{unique_id}"
+            return JSONResponse(content={"url": str(new_url)})
         raise HTTPException(status_code=500, detail="Failed to create image")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

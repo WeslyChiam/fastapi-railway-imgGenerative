@@ -14,7 +14,7 @@ class ImagePigPromptRequest(BaseModel):
 
 class OpenAIPromptRequest(BaseModel):
     prompt: constr(min_length=1, max_length=1000) = Field(..., example = SAMPLE_TEXT) # type: ignore
-    model: Optional[Literal["dall-e-2"]] = Field(default="dall-e-2")
+    model: Optional[Literal["dall-e-2", "dall-e-3"]] = Field(default="dall-e-2")
 
 class OpenAIEditPromptRequest(BaseModel):
     prompt: constr(min_length=1, max_length=1000) = Field(...) # type: ignore
